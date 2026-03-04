@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+*.sqlite3
+chroma_db/
+
+# Build artifacts
+dist/
+build/
+mac_build/
+*.spec
+
+# Frontend
+node_modules/
+frontend/dist/
