@@ -97,6 +97,9 @@ docker compose down
   - Docker Desktop → Settings → Resources → File Sharing
   - Add your project parent folder (for example `/Users/<you>/Downloads`)
 - Fix C: if still blocked, grant Full Disk Access to Docker Desktop in macOS Privacy settings, then restart Docker Desktop.
+- If backend shows `ImportError` around `langchain.agents`:
+  - Pull latest code and rebuild images:
+  - `git pull && docker compose build --no-cache && docker compose up`
 
 ## Developer Usage (Without Docker)
 
