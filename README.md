@@ -1,5 +1,8 @@
 # AtomeBot
 
+Developer: Zhang Zhiyao
+Version: 1.0
+
 AtomeBot is an AI customer support workspace for Atome use cases.
 
 Repository:
@@ -19,8 +22,10 @@ Repository:
 
 - Use only the packaged software file:
   - `AtomeDesk-macOS.zip`
+- If you cannot find the zip in your local copy, download it from Release v1.0:
+  - `https://github.com/zzybluebell/TA-atome-bot/releases/tag/v1.0-mac`
 - End users do not need to read code, configure backend, or run terminal commands.
-- End users only need to double-click `StartAtomeDesk.command` after unzipping.
+- After unzipping, open the `AtomeDeskBundle` folder and double-click `StartAtomeDesk.command`.
 - Open `http://localhost:8000` in browser.
 
 ### User Type B: Professional Developer
@@ -30,11 +35,13 @@ Repository:
 
 ## Beginner Usage (No Code Workflow)
 
-1. Get `AtomeDesk-macOS.zip`.
+1. Get `AtomeDesk-macOS.zip` from local `mac_build` or Release v1.0.
 2. Double-click to unzip.
 3. Open `AtomeDeskBundle` folder.
-4. Double-click `StartAtomeDesk.command`.
-5. Open `http://localhost:8000`.
+4. Open the `bin` folder and confirm `AtomeDesk` exists.
+5. Go back to `AtomeDeskBundle`.
+6. Double-click `StartAtomeDesk.command`.
+7. Open `http://localhost:8000`.
 
 ## Developer Usage (Docker)
 
