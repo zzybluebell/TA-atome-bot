@@ -12,6 +12,16 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
+PYTHON_VERSION="$(python3 -c 'import sys; print(f\"{sys.version_info.major}.{sys.version_info.minor}\")')"
+case "$PYTHON_VERSION" in
+  3.10|3.11|3.12) ;;
+  *)
+    echo "Unsupported python version: $PYTHON_VERSION"
+    echo "Please use Python 3.10, 3.11, or 3.12 for local setup."
+    exit 1
+    ;;
+esac
+
 if ! command -v npm >/dev/null 2>&1; then
   echo "npm is required (Node.js 18+)."
   exit 1
@@ -23,7 +33,7 @@ fi
 
 source "$VENV_DIR/bin/activate"
 pip install --upgrade pip
-pip install fastapi uvicorn python-dotenv langchain langchain-openai langchain-community langchain-core langchain-chroma chromadb openai beautifulsoup4 cloudscraper pypdf python-docx python-multipart
+pip install -r "$BACKEND_DIR/requirements.txt"
 
 cd "$FRONTEND_DIR"
 npm install

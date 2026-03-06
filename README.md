@@ -100,6 +100,8 @@ docker compose down
 
 ## Developer Usage (Without Docker)
 
+Python requirement for local mode: 3.10 / 3.11 / 3.12.
+
 ```bash
 ./dev_setup.sh
 ```

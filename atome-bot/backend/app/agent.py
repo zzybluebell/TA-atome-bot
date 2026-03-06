@@ -3,7 +3,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from langchain.agents import create_openai_tools_agent, AgentExecutor
+from langchain.agents import AgentExecutor
+try:
+    from langchain.agents import create_openai_tools_agent
+except ImportError:
+    from langchain.agents import create_tool_calling_agent as create_openai_tools_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.tools.retriever import create_retriever_tool
 from app.tools import check_application_status, check_transaction_status
