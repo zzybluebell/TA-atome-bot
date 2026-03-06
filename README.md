@@ -18,10 +18,10 @@ Repository:
 ### User Type A: Beginner End User
 
 - Use only the packaged software file:
-  - `mac_build/AtomeDesk-macOS.zip`
+  - `AtomeDeskBundle-macOS.zip`
 - End users do not need to read code, configure backend, or run terminal commands.
-- End users only need to double-click `AtomeDesk` after unzipping.
-- If the app prompts for runtime support, install/open Docker Desktop once and launch again.
+- End users only need to double-click `StartAtomeDesk.command` after unzipping.
+- Open `http://localhost:8000` in browser.
 
 ### User Type B: Professional Developer
 
@@ -30,11 +30,11 @@ Repository:
 
 ## Beginner Usage (No Code Workflow)
 
-1. Get `AtomeDesk-macOS.zip`.
+1. Get `AtomeDeskBundle-macOS.zip`.
 2. Double-click to unzip.
-3. Open `AtomeDesk` folder.
-4. Double-click `AtomeDesk`.
-5. Browser opens to `http://localhost:5173`.
+3. Open `AtomeDeskBundle` folder.
+4. Double-click `StartAtomeDesk.command`.
+5. Open `http://localhost:8000`.
 
 ## Developer Usage (Docker)
 
