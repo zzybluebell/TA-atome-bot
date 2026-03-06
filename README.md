@@ -57,16 +57,22 @@ Create API key file from template:
 cp atome-bot/backend/.env.example atome-bot/backend/.env
 ```
 
-Then edit:
+Then edit with your own api key:
 
 ```bash
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
 ```
 
-Start:
+Start (hot-reload mode, bind mounts):
 
 ```bash
 docker compose up --build
+```
+
+If Docker Desktop reports mount permission errors on macOS, use no-volume mode:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.novolumes.yml up --build
 ```
 
 Open:
@@ -80,6 +86,17 @@ Stop:
 ```bash
 docker compose down
 ```
+
+### Docker Troubleshooting (macOS)
+
+- Error example: `error while creating mount source path ... operation not permitted`
+- Cause: Docker Desktop cannot mount your project folder from host.
+- Fix A (recommended): run no-volume mode
+  - `docker compose -f docker-compose.yml -f docker-compose.novolumes.yml up --build`
+- Fix B: allow folder sharing in Docker Desktop
+  - Docker Desktop → Settings → Resources → File Sharing
+  - Add your project parent folder (for example `/Users/<you>/Downloads`)
+- Fix C: if still blocked, grant Full Disk Access to Docker Desktop in macOS Privacy settings, then restart Docker Desktop.
 
 ## Developer Usage (Without Docker)
 
@@ -128,5 +145,6 @@ npm run dev -- --host 0.0.0.0 --port 5173
 - `atome-bot/backend/.env.example`: environment variable template for developers
 - `atome-bot/frontend/`: React + Vite + Tailwind
 - `docker-compose.yml`: developer docker stack
+- `docker-compose.novolumes.yml`: docker override without host mounts
 - `dev_setup.sh`: developer local setup script
 - `start.sh`: one-terminal local dev startup (backend + frontend)

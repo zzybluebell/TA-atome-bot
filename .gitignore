@@ -9,8 +9,9 @@ chroma_db/
 # Build artifacts
 dist/
 build/
-mac_build/
 *.spec
+mac_build/*.zip
+mac_build/AtomeDesk/
 
 # Frontend
 node_modules/
