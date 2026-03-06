@@ -22,6 +22,7 @@ Repository:
 
 - Use only the packaged software file:
   - `AtomeDesk-macOS.zip`
+- `mac_build` is under project root: `./mac_build`
 - If you cannot find the zip in your local copy, download it from Release v1.0:
   - `https://github.com/zzybluebell/TA-atome-bot/releases/tag/v1.0-mac`
 - End users do not need to read code, configure backend, or run terminal commands.
