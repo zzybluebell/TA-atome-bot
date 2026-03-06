@@ -51,10 +51,13 @@ git clone https://github.com/zzybluebell/TA-atome-bot.git
 cd TA-atome-bot
 ```
 
-Create API key file:
+Create API key file from template:
 
-- `atome-bot/backend/.env`
-- content:
+```bash
+cp atome-bot/backend/.env.example atome-bot/backend/.env
+```
+
+Then edit:
 
 ```bash
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
@@ -122,6 +125,7 @@ npm run dev -- --host 0.0.0.0 --port 5173
 ## Project Structure
 
 - `atome-bot/backend/`: FastAPI + LangChain + ChromaDB
+- `atome-bot/backend/.env.example`: environment variable template for developers
 - `atome-bot/frontend/`: React + Vite + Tailwind
 - `docker-compose.yml`: developer docker stack
 - `dev_setup.sh`: developer local setup script
