@@ -19,6 +19,7 @@ if getattr(sys, "frozen", False):
     os.environ.setdefault("CHROMA_DISABLED", "1")
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -36,6 +37,16 @@ def _parse_bool_form_value(raw_value: str) -> bool:
     return str(raw_value).strip().lower() in {"1", "true", "yes", "on"}
 
 app = FastAPI(title="Atome AI Bot API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def _resolve_static_dir() -> Path | None:
     if getattr(sys, "frozen", False):

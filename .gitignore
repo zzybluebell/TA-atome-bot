@@ -12,6 +12,7 @@ build/
 *.spec
 mac_build/*.zip
 mac_build/AtomeDesk/
+.DS_Store
 
 # Frontend
 node_modules/
