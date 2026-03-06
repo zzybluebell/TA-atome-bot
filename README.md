@@ -153,3 +153,9 @@ npm run dev -- --host 0.0.0.0 --port 5173
 - `docker-compose.novolumes.yml`: docker override without host mounts
 - `dev_setup.sh`: developer local setup script
 - `start.sh`: one-terminal local dev startup (backend + frontend)
+
+## AI Assistance Disclosure
+
+- This project used AI-assisted development support.
+- LLM used: GPT-5.3.
+- IDE used for AI-assisted development: Trae IDE.
