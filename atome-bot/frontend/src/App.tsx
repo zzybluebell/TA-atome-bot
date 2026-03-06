@@ -9,6 +9,14 @@ import {
   RefreshCw,
   User,
   Bot,
+  ShieldCheck,
+  Users,
+  ArrowLeft,
+  Wallet,
+  Percent,
+  BadgeCheck,
+  CreditCard,
+  FileUp,
 } from "lucide-react";
 
 type Role = "user" | "bot";
@@ -25,7 +33,7 @@ type Config = {
 
 type ChatHistoryItem = ["human" | "ai", string];
 
-type PopupKind = "success" | "error" | "info";
+type PopupKind = "success" | "error" | "info" | "loading";
 
 type PopupState = {
   open: boolean;
@@ -34,7 +42,10 @@ type PopupState = {
   kind: PopupKind;
 };
 
+type UserMode = "customer" | "manager";
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
+const GET_APP_URL = "https://www.atome.sg/get-the-app";
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([
@@ -50,6 +61,11 @@ function App() {
   const [config, setConfig] = useState<Config>({ url: "", guidelines: [] });
   const [showConfig, setShowConfig] = useState(false);
   const [managerInstruction, setManagerInstruction] = useState("");
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [replaceExistingDocs, setReplaceExistingDocs] = useState(false);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
+  const [refreshingConfig, setRefreshingConfig] = useState(false);
+  const [applyingInstruction, setApplyingInstruction] = useState(false);
 
   const [reportingMistake, setReportingMistake] = useState<number | null>(null);
   const [feedbackText, setFeedbackText] = useState("");
@@ -59,10 +75,14 @@ function App() {
     message: "",
     kind: "info",
   });
+  const [userMode, setUserMode] = useState<UserMode | null>(null);
+  const isManager = userMode === "manager";
 
   useEffect(() => {
-    fetchConfig();
-  }, []);
+    if (isManager) {
+      fetchConfig();
+    }
+  }, [isManager]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -115,7 +135,14 @@ function App() {
   };
 
   const handleManagerInstruction = async () => {
-    if (!managerInstruction.trim()) return;
+    if (!managerInstruction.trim() || applyingInstruction) return;
+    setApplyingInstruction(true);
+    setPopup({
+      open: true,
+      title: "Applying Instruction",
+      message: "Please wait while meta-agent updates the bot behavior.",
+      kind: "loading",
+    });
     try {
       const res = await axios.post<{ summary: string }>(
         `${API_BASE}/manager/instruct`,
@@ -138,6 +165,8 @@ function App() {
         message: "Failed to process instruction.",
         kind: "error",
       });
+    } finally {
+      setApplyingInstruction(false);
     }
   };
 
@@ -174,13 +203,235 @@ function App() {
     }
   };
 
+  const handleUploadDocs = async () => {
+    if (!uploadFiles.length) return;
+    setUploadingDocs(true);
+    setPopup({
+      open: true,
+      title: "Uploading Documents",
+      message:
+        "Please wait while documents are parsed and added to knowledge base.",
+      kind: "loading",
+    });
+    try {
+      const formData = new FormData();
+      uploadFiles.forEach((file) => formData.append("files", file));
+      formData.append("replace_existing", String(replaceExistingDocs));
+
+      const res = await axios.post<{
+        ingested_documents: number;
+        ingested_files: number;
+        accepted_files?: Array<{ file_name: string; score: number }>;
+        rejected_files?: Array<{
+          file_name: string;
+          score: number;
+          reason: string;
+        }>;
+        failed_files: Array<{ file_name: string; error: string }>;
+      }>(`${API_BASE}/manager/upload-docs`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      const failed = res.data.failed_files ?? [];
+      const rejected = res.data.rejected_files ?? [];
+      const failedSummary = failed.length
+        ? `\nFailed: ${failed.map((f) => `${f.file_name} (${f.error})`).join(", ")}`
+        : "";
+      const rejectedSummary = rejected.length
+        ? `\nRejected: ${rejected.map((f) => `${f.file_name} (score ${f.score})`).join(", ")}`
+        : "";
+
+      setPopup({
+        open: true,
+        title: "Documents Uploaded",
+        message: `Accepted Files: ${res.data.ingested_files}, Chunks: ${res.data.ingested_documents}${rejectedSummary}${failedSummary}`,
+        kind: "success",
+      });
+      setUploadFiles([]);
+      fetchConfig();
+    } catch (error) {
+      const message =
+        axios.isAxiosError(error) && error.response?.data?.detail
+          ? String(error.response.data.detail)
+          : "Failed to upload documents.";
+      setPopup({
+        open: true,
+        title: "Upload Failed",
+        message,
+        kind: "error",
+      });
+    } finally {
+      setUploadingDocs(false);
+    }
+  };
+
+  const handleRefreshKnowledgeBase = async () => {
+    if (!config.url || refreshingConfig) return;
+    setRefreshingConfig(true);
+    setPopup({
+      open: true,
+      title: "Refreshing Knowledge Base",
+      message:
+        "Please wait while backend is recrawling and rebuilding knowledge.",
+      kind: "loading",
+    });
+    try {
+      const res = await axios.post<{
+        recrawled?: boolean;
+        documents_indexed?: number;
+      }>(`${API_BASE}/config`, {
+        url: config.url,
+        guidelines: config.guidelines || [],
+        force_recrawl: true,
+      });
+      const indexed = res.data?.documents_indexed ?? 0;
+      setPopup({
+        open: true,
+        title: "Configuration Updated",
+        message: `Knowledge base refreshed successfully. Indexed ${indexed} documents.`,
+        kind: "success",
+      });
+      fetchConfig();
+    } catch (error) {
+      const message =
+        axios.isAxiosError(error) && error.response?.data?.detail
+          ? String(error.response.data.detail)
+          : "Failed to update config.";
+      setPopup({
+        open: true,
+        title: "Request Failed",
+        message,
+        kind: "error",
+      });
+    } finally {
+      setRefreshingConfig(false);
+    }
+  };
+
+  const handleGetApp = () => {
+    const ua = (navigator.userAgent || "").toLowerCase();
+    const platform = /android/.test(ua)
+      ? "android"
+      : /iphone|ipad|ipod/.test(ua)
+        ? "ios"
+        : "web";
+    const targetUrl = `${GET_APP_URL}?platform=${platform}`;
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
+  };
+
+  if (!userMode) {
+    return (
+      <div className="min-h-screen bg-white text-black">
+        <header className="sticky top-0 z-10 border-b border-black/10 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 md:px-6">
+            <div className="flex items-center gap-2 text-2xl font-black tracking-tight">
+              <span>atome</span>
+              <span className="text-lg">ᴀ</span>
+            </div>
+            <nav className="hidden items-center gap-7 text-sm font-semibold md:flex">
+              <span>Shop with Atome</span>
+              <span>Atome+</span>
+              <span>Business</span>
+              <span>Help</span>
+            </nav>
+            <button
+              onClick={handleGetApp}
+              className="rounded-full bg-[#e9ff4f] px-5 py-2 text-sm font-bold text-black"
+            >
+              Get the app
+            </button>
+          </div>
+        </header>
+
+        <main className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-10 md:grid-cols-2 md:px-6 md:py-14">
+          <section>
+            <h1 className="text-4xl font-black leading-tight md:text-6xl">
+              We call this empowered support.
+              <br />
+              You&apos;re in control.
+            </h1>
+
+            <div className="mt-8 space-y-4 text-base font-semibold">
+              <p className="flex items-center gap-3">
+                <Wallet size={18} /> Stretch your service productivity with AI
+                assistance
+              </p>
+              <p className="flex items-center gap-3">
+                <Percent size={18} /> Split customer and manager experiences
+                clearly
+              </p>
+              <p className="flex items-center gap-3">
+                <BadgeCheck size={18} /> Configure behavior safely via
+                meta-agent workspace
+              </p>
+              <p className="flex items-center gap-3">
+                <CreditCard size={18} /> Keep customer chat simple and focused
+              </p>
+            </div>
+
+            <div className="mt-9 space-y-3">
+              <button
+                onClick={() => {
+                  setUserMode("customer");
+                  setShowConfig(false);
+                }}
+                className="w-full rounded-full bg-black px-6 py-4 text-left text-white transition hover:bg-black/85"
+              >
+                <span className="flex items-center gap-2 text-base font-bold">
+                  <Users size={18} /> Continue as Customer
+                </span>
+                <span className="mt-1 block text-xs text-white/75">
+                  Chat with the bot only. All current bot interaction features
+                  are preserved.
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setUserMode("manager");
+                  setShowConfig(true);
+                }}
+                className="w-full rounded-full border border-black px-6 py-4 text-left transition hover:bg-black/5"
+              >
+                <span className="flex items-center gap-2 text-base font-bold">
+                  <ShieldCheck size={18} /> Continue as Customer Service Manager
+                </span>
+                <span className="mt-1 block text-xs text-gray-600">
+                  Open configure + bot workbench to co-build, debug, and repair
+                  with meta-agent.
+                </span>
+              </button>
+            </div>
+          </section>
+
+          <section className="flex items-center justify-center">
+            <div className="relative w-full max-w-sm rounded-[2.4rem] border-[10px] border-gray-200 bg-[#e9ff4f] p-10 shadow-xl">
+              <div className="mx-auto flex h-40 w-40 items-center justify-center text-8xl font-black leading-none">
+                A
+              </div>
+              <p className="mt-10 text-center text-xl font-black tracking-tight">
+                atome
+              </p>
+              <p className="mt-1 text-center text-sm font-semibold">
+                Customer Experience AI
+              </p>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-gray-100 text-gray-800 font-sans">
       {popup.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div
             className="absolute inset-0"
-            onClick={() => setPopup((prev) => ({ ...prev, open: false }))}
+            onClick={() =>
+              popup.kind !== "loading" &&
+              setPopup((prev) => ({ ...prev, open: false }))
+            }
           />
           <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/10">
             <div className="flex items-start justify-between gap-4">
@@ -191,13 +442,17 @@ function App() {
                       ? "bg-emerald-100 text-emerald-600"
                       : popup.kind === "error"
                         ? "bg-rose-100 text-rose-600"
-                        : "bg-indigo-100 text-indigo-600"
+                        : popup.kind === "loading"
+                          ? "bg-indigo-100 text-indigo-600"
+                          : "bg-indigo-100 text-indigo-600"
                   }`}
                 >
                   {popup.kind === "success" ? (
                     <span className="text-lg">✓</span>
                   ) : popup.kind === "error" ? (
                     <span className="text-lg">!</span>
+                  ) : popup.kind === "loading" ? (
+                    <span className="inline-block h-5 w-5 rounded-full border-2 border-indigo-300 border-t-indigo-600 animate-spin" />
                   ) : (
                     <span className="text-lg">i</span>
                   )}
@@ -211,124 +466,163 @@ function App() {
                   </p>
                 </div>
               </div>
-              <button
-                className="rounded-full p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-                onClick={() => setPopup((prev) => ({ ...prev, open: false }))}
-                aria-label="Close"
-              >
-                ×
-              </button>
+              {popup.kind !== "loading" && (
+                <button
+                  className="rounded-full p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  onClick={() => setPopup((prev) => ({ ...prev, open: false }))}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              )}
             </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                onClick={() => setPopup((prev) => ({ ...prev, open: false }))}
-              >
-                OK
-              </button>
-            </div>
+            {popup.kind !== "loading" && (
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                  onClick={() => setPopup((prev) => ({ ...prev, open: false }))}
+                >
+                  OK
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
-      <div
-        className={`w-1/3 bg-white border-r border-gray-200 p-6 flex flex-col transition-all ${
-          showConfig ? "" : "hidden"
-        } md:flex`}
-      >
-        <div className="mb-6">
-          <h2 className="text-xl font-bold flex items-center gap-2 text-indigo-600">
-            <Settings size={20} /> Agent Configuration
-          </h2>
-          <p className="text-sm text-gray-500">
-            Manage knowledge base and guidelines
-          </p>
-        </div>
+      {isManager && (
+        <div
+          className={`w-full md:w-1/3 bg-white border-r border-gray-200 p-6 flex flex-col transition-all ${
+            showConfig ? "" : "hidden"
+          }`}
+        >
+          <div className="mb-6">
+            <h2 className="text-xl font-bold flex items-center gap-2 text-indigo-600">
+              <Settings size={20} /> Agent Configuration
+            </h2>
+            <p className="text-sm text-gray-500">
+              Manage knowledge base and guidelines
+            </p>
+          </div>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-1">
-            Knowledge Base URL
-          </label>
-          <div className="flex gap-2">
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-1">
+              Knowledge Base URL
+            </label>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 p-2 border rounded text-sm bg-gray-50"
+                value={config.url}
+                onChange={(event) =>
+                  setConfig({ ...config, url: event.target.value })
+                }
+              />
+              <button
+                onClick={handleRefreshKnowledgeBase}
+                disabled={refreshingConfig || !config.url}
+                className="p-2 bg-indigo-100 text-indigo-600 rounded hover:bg-indigo-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCw
+                  size={16}
+                  className={refreshingConfig ? "animate-spin" : ""}
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-6 rounded-xl border border-indigo-100 bg-indigo-50/40 p-3">
+            <label className="block text-sm font-medium mb-2 text-indigo-700">
+              Upload Knowledge Docs
+            </label>
             <input
-              className="flex-1 p-2 border rounded text-sm bg-gray-50"
-              value={config.url}
+              type="file"
+              multiple
+              accept=".pdf,.docx,.txt,.md"
               onChange={(event) =>
-                setConfig({ ...config, url: event.target.value })
+                setUploadFiles(Array.from(event.target.files || []))
               }
+              className="w-full rounded border border-gray-200 bg-white p-2 text-xs text-gray-700"
+            />
+            <p className="mt-2 text-xs text-gray-500">
+              Supports .pdf/.docx/.txt/.md, up to 10 files, 10MB each.
+            </p>
+            <label className="mt-2 flex items-center gap-2 text-xs text-gray-600">
+              <input
+                type="checkbox"
+                checked={replaceExistingDocs}
+                onChange={(event) =>
+                  setReplaceExistingDocs(event.target.checked)
+                }
+              />
+              Replace existing knowledge base
+            </label>
+            {uploadFiles.length > 0 && (
+              <p className="mt-2 text-xs text-gray-500">
+                Selected: {uploadFiles.map((file) => file.name).join(", ")}
+              </p>
+            )}
+            <button
+              onClick={handleUploadDocs}
+              disabled={uploadingDocs || uploadFiles.length === 0}
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <FileUp size={14} />
+              {uploadingDocs ? "Uploading..." : "Upload Documents"}
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto mb-6">
+            <label className="block text-sm font-medium mb-1">
+              Current Guidelines
+            </label>
+            <ul className="list-disc pl-5 text-sm space-y-1 text-gray-600">
+              {config.guidelines.map((guideline, index) => (
+                <li key={index}>{guideline}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="border-t pt-4">
+            <label className="block text-sm font-medium mb-2 text-indigo-700">
+              Manager Instruction (Meta-Agent)
+            </label>
+            <textarea
+              className="w-full p-2 border rounded text-sm mb-2 h-24"
+              placeholder="E.g., 'If users ask about refund, tell them it takes 3-5 days.'"
+              value={managerInstruction}
+              onChange={(event) => setManagerInstruction(event.target.value)}
             />
             <button
-              onClick={() => {
-                if (!config.url) return;
-                axios
-                  .post(`${API_BASE}/config`, {
-                    url: config.url,
-                    guidelines: config.guidelines || [],
-                  })
-                  .then(() =>
-                    setPopup({
-                      open: true,
-                      title: "Configuration Updated",
-                      message: "URL updated and recrawling started.",
-                      kind: "success",
-                    }),
-                  )
-                  .catch(() =>
-                    setPopup({
-                      open: true,
-                      title: "Request Failed",
-                      message: "Failed to update config.",
-                      kind: "error",
-                    }),
-                  );
-              }}
-              className="p-2 bg-indigo-100 text-indigo-600 rounded hover:bg-indigo-200"
+              onClick={handleManagerInstruction}
+              disabled={applyingInstruction || !managerInstruction.trim()}
+              className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 transition disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <RefreshCw size={16} />
+              {applyingInstruction ? "Applying..." : "Apply Instruction"}
             </button>
           </div>
         </div>
-
-        <div className="flex-1 overflow-y-auto mb-6">
-          <label className="block text-sm font-medium mb-1">
-            Current Guidelines
-          </label>
-          <ul className="list-disc pl-5 text-sm space-y-1 text-gray-600">
-            {config.guidelines.map((guideline, index) => (
-              <li key={index}>{guideline}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="border-t pt-4">
-          <label className="block text-sm font-medium mb-2 text-indigo-700">
-            Manager Instruction (Meta-Agent)
-          </label>
-          <textarea
-            className="w-full p-2 border rounded text-sm mb-2 h-24"
-            placeholder="E.g., 'If users ask about refund, tell them it takes 3-5 days.'"
-            value={managerInstruction}
-            onChange={(event) => setManagerInstruction(event.target.value)}
-          />
-          <button
-            onClick={handleManagerInstruction}
-            className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 transition"
-          >
-            Apply Instruction
-          </button>
-        </div>
-      </div>
+      )}
 
       <div className="flex-1 flex flex-col relative">
         <header className="bg-white p-4 shadow-sm flex justify-between items-center z-10">
           <h1 className="text-lg font-semibold text-gray-800">
-            Atome Customer Service Bot
+            {isManager ? "Manager Workspace" : "Customer Chat"}
           </h1>
-          <button
-            onClick={() => setShowConfig(!showConfig)}
-            className="md:hidden p-2 text-gray-600"
-          >
-            <Settings />
-          </button>
+          <div className="flex items-center gap-2">
+            {isManager && (
+              <button
+                onClick={() => setShowConfig(!showConfig)}
+                className="md:hidden p-2 text-gray-600"
+              >
+                <Settings />
+              </button>
+            )}
+            <button
+              onClick={() => setUserMode(null)}
+              className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+            >
+              <ArrowLeft size={14} /> Logout
+            </button>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">

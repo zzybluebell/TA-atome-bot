@@ -18,7 +18,7 @@ os.environ.setdefault("CHROMA_PERSIST_DIR", str(RUNTIME_ROOT / "chroma_db"))
 if getattr(sys, "frozen", False):
     os.environ.setdefault("CHROMA_DISABLED", "1")
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -28,6 +28,12 @@ from app.manager import meta_agent_instance
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+MAX_UPLOAD_FILES = 10
+MAX_UPLOAD_FILE_SIZE = 10 * 1024 * 1024
+
+
+def _parse_bool_form_value(raw_value: str) -> bool:
+    return str(raw_value).strip().lower() in {"1", "true", "yes", "on"}
 
 app = FastAPI(title="Atome AI Bot API")
 
@@ -55,6 +61,7 @@ class ChatRequest(BaseModel):
 class ConfigUpdateRequest(BaseModel):
     url: Optional[str] = None
     guidelines: Optional[List[str]] = None
+    force_recrawl: Optional[bool] = False
 
 class FeedbackRequest(BaseModel):
     user_query: str
@@ -103,8 +110,12 @@ def get_config():
 def update_config(config: ConfigUpdateRequest):
     """Update bot configuration (URL or guidelines)."""
     try:
-        get_bot_instance().update_config(url=config.url, guidelines=config.guidelines)
-        return {"status": "success", "message": "Configuration updated"}
+        result = get_bot_instance().update_config(
+            url=config.url,
+            guidelines=config.guidelines,
+            force_recrawl=bool(config.force_recrawl),
+        )
+        return {"status": "success", "message": "Configuration updated", **result}
     except Exception as e:
         logger.error(f"Config update error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -135,6 +146,44 @@ def manager_instruction(req: ManagerInstructionRequest):
         return {"status": "success", "summary": summary}
     except Exception as e:
         logger.error(f"Manager instruction error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/manager/upload-docs")
+async def manager_upload_docs(
+    files: List[UploadFile] = File(...),
+    replace_existing: str = Form("false"),
+):
+    try:
+        replace_existing_enabled = _parse_bool_form_value(replace_existing)
+        if len(files) > MAX_UPLOAD_FILES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Too many files. Maximum allowed is {MAX_UPLOAD_FILES}.",
+            )
+
+        payloads: List[tuple[str, bytes]] = []
+        for file in files:
+            content = await file.read()
+            if not content:
+                continue
+            if len(content) > MAX_UPLOAD_FILE_SIZE:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"File '{file.filename}' exceeds size limit ({MAX_UPLOAD_FILE_SIZE // (1024 * 1024)}MB).",
+                )
+            payloads.append((file.filename or "uploaded_file", content))
+
+        if not payloads:
+            raise HTTPException(status_code=400, detail="No valid file content found in upload.")
+
+        result = get_bot_instance().ingest_documents(payloads, replace_existing=replace_existing_enabled)
+        return {"status": "success", "replace_existing_applied": replace_existing_enabled, **result}
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Upload docs error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if STATIC_DIR:

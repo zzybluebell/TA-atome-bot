@@ -42,24 +42,32 @@ class VectorStoreManager:
         """Clear the vector store."""
         logger.info("Clearing vector store...")
         try:
-            # Attempt to delete all documents instead of nuking the directory
-            # This avoids file locking issues with SQLite
             if self.vector_store:
-                ids = self.vector_store.get()['ids']
-                if ids:
+                deleted = 0
+                while True:
+                    result = self.vector_store.get(limit=1000)
+                    ids = result.get("ids") or []
+                    if not ids:
+                        break
                     self.vector_store.delete(ids=ids)
-                    logger.info(f"Deleted {len(ids)} documents from vector store.")
+                    deleted += len(ids)
+                logger.info(f"Deleted {deleted} documents from vector store.")
             else:
-                # If vector_store is not initialized, try to remove directory
                 if os.path.exists(self.persist_dir):
                     shutil.rmtree(self.persist_dir)
                 self._init_db()
         except Exception as e:
             logger.error(f"Error clearing vector store: {e}")
-            # Fallback: try to re-init anyway
             self._init_db()
 
     def as_retriever(self):
         if not self.vector_store:
             return None
+        try:
+            self.vector_store.get(limit=1)
+        except Exception as e:
+            logger.error(f"Vector store unavailable, reinitializing: {e}")
+            self._init_db()
+            if not self.vector_store:
+                return None
         return self.vector_store.as_retriever()

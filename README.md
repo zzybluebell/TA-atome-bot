@@ -1,55 +1,128 @@
-# Atome AI Customer Service Bot
+# AtomeBot
 
-This project implements an AI Customer Service Bot with RAG, Tool Use, and Meta-Agent capabilities.
+AtomeBot is an AI customer support workspace for Atome use cases.
 
-## Features
+Repository:
 
-1.  **Service Bot (Part 1)**:
-    *   **RAG**: Answers questions from Atome Help Center.
-    *   **Tools**: Checks application status and transaction status (Mocked).
-    *   **Auto-fix**: Users can report mistakes, and the bot automatically adds new rules to its guidelines to fix itself.
+- https://github.com/zzybluebell/TA-atome-bot
 
-2.  **Meta-Agent (Part 2)**:
-    *   **Manager Instruction**: Managers can give natural language instructions (e.g., "Be more polite", "If user asks X, say Y") to update the bot's behavior.
-    *   **Dynamic Config**: Knowledge Base URL and Guidelines are configurable via UI.
+## Product Scope
 
-## Setup & Run
+- Uses RAG over Atome help-center content
+- Supports tool-based support actions (mocked)
+- Lets managers update behavior rules in real time
+- Supports knowledge-doc upload with relevance filtering
 
-1.  **Prerequisites**:
-    *   Python 3.8+
-    *   Node.js 16+
-    *   OpenAI API Key
+## User Types
 
-2.  **Configuration**:
-    *   Open `atome-bot/backend/.env`
-    *   Paste your OpenAI API Key: `OPENAI_API_KEY=sk-......`
+### User Type A: Beginner End User
 
-3.  **Run**:
-    ```bash
-    chmod +x start.sh
-    ./start.sh
-    ```
-    *   Backend: http://localhost:8000
-    *   Frontend: http://localhost:5173
+- Use only the packaged software file:
+  - `mac_build/AtomeDesk-macOS.zip`
+- End users do not need to read code, configure backend, or run terminal commands.
+- End users only need to double-click `AtomeDesk` after unzipping.
+- If the app prompts for runtime support, install/open Docker Desktop once and launch again.
+
+### User Type B: Professional Developer
+
+- Docker workflow is for developers only.
+- Clone repository and run the full stack for development, debugging, and code changes.
+
+## Beginner Usage (No Code Workflow)
+
+1. Get `AtomeDesk-macOS.zip`.
+2. Double-click to unzip.
+3. Open `AtomeDesk` folder.
+4. Double-click `AtomeDesk`.
+5. Browser opens to `http://localhost:5173`.
+
+## Developer Usage (Docker)
+
+### Prerequisites
+
+- macOS
+- Docker Desktop
+- OpenAI API key
+
+### Steps
+
+```bash
+git clone https://github.com/zzybluebell/TA-atome-bot.git
+cd TA-atome-bot
+```
+
+Create API key file:
+
+- `atome-bot/backend/.env`
+- content:
+
+```bash
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
+```
+
+Start:
+
+```bash
+docker compose up --build
+```
+
+Open:
+
+- Frontend: http://localhost:5173
+- Backend: http://localhost:8000
+- API docs: http://localhost:8000/docs
+
+Stop:
+
+```bash
+docker compose down
+```
+
+## Developer Usage (Without Docker)
+
+```bash
+./dev_setup.sh
+```
+
+Then:
+
+```bash
+cd atome-bot/backend
+source venv/bin/activate
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+In a new terminal:
+
+```bash
+cd atome-bot/frontend
+npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+## Developer Helper Script (`start.sh`)
+
+- `start.sh` is a developer convenience script for local runs.
+- It checks whether `atome-bot/backend/.env` already contains an OpenAI key.
+- It starts backend (`uvicorn`) and frontend (`npm run dev`) together in one terminal.
+- It tracks child process IDs and stops both services automatically when you exit (`Ctrl + C`).
+- Use it only after local dependencies are already installed:
+  - backend virtual environment is ready
+  - frontend packages are installed
+
+## Current Web Rules
+
+- Upload supports `.pdf`, `.docx`, `.txt`, `.md`
+- Max upload count is 10 files per request
+- Max file size is 10MB per file
+- Encrypted PDFs are rejected
+- Replace mode clears existing vector knowledge first
+- Refresh URL triggers full recrawl and re-index
+- Apply Instruction updates system guidelines immediately
 
 ## Project Structure
 
-*   `backend/`: FastAPI + LangChain + ChromaDB
-    *   `app/agent.py`: Service Bot Logic
-    *   `app/manager.py`: Meta-Agent Logic
-    *   `app/crawler.py`: Web Crawler
-*   `frontend/`: React + Tailwind + Lucide
-
-## Usage Guide
-
-1.  **Chat**: Type your questions in the main chat window.
-    *   Try: "What is Atome card?" (RAG)
-    *   Try: "Check my application status for user 12345" (Tool)
-    *   Try: "Why did my transaction 999 fail?" (Tool)
-2.  **Report Mistake**: 
-    *   Click "Report Mistake" under a bot response.
-    *   Enter the correct behavior.
-    *   Watch the "Current Guidelines" in the sidebar update automatically.
-3.  **Manager Instruction**:
-    *   In the sidebar, type an instruction like "Always end responses with 'Have a nice day!'".
-    *   Click "Apply Instruction" and see the bot's behavior change.
+- `atome-bot/backend/`: FastAPI + LangChain + ChromaDB
+- `atome-bot/frontend/`: React + Vite + Tailwind
+- `docker-compose.yml`: developer docker stack
+- `dev_setup.sh`: developer local setup script
+- `start.sh`: one-terminal local dev startup (backend + frontend)

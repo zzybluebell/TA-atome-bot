@@ -9,6 +9,8 @@ from langchain.tools.retriever import create_retriever_tool
 from app.tools import check_application_status, check_transaction_status
 from app.vector_store import VectorStoreManager
 from app.crawler import AtomeCrawler
+from app.document_reader import DocumentReader
+from app.relevance_guard import DocumentRelevanceGuard
 from typing import List
 
 class ServiceBot:
@@ -17,6 +19,8 @@ class ServiceBot:
         self.temperature = 0
         self.vector_store_manager = VectorStoreManager()
         self.crawler = AtomeCrawler()
+        self.document_reader = DocumentReader()
+        self.relevance_guard = DocumentRelevanceGuard()
         
         # Default Configuration
         self.knowledge_base_url = "https://help.atome.ph/hc/en-gb/categories/4439682039065-Atome-Card"
@@ -73,12 +77,20 @@ Be professional, concise, and helpful.
         else:
             print("Warning: No documents found during crawl.")
 
-    def update_config(self, url: str = None, guidelines: List[str] = None):
+    def update_config(self, url: str = None, guidelines: List[str] = None, force_recrawl: bool = False):
         """Update bot configuration and reload agent."""
-        if url and url != self.knowledge_base_url:
-            self.knowledge_base_url = url
-            # Trigger re-crawl if URL changes
-            docs = self.crawler.crawl(url)
+        target_url = (url or self.knowledge_base_url).strip()
+        should_recrawl = bool(target_url) and (force_recrawl or target_url != self.knowledge_base_url)
+        crawled_documents = 0
+
+        if target_url and target_url != self.knowledge_base_url:
+            self.knowledge_base_url = target_url
+
+        if should_recrawl:
+            docs = self.crawler.crawl(target_url)
+            if not docs:
+                raise ValueError("No documents found from the knowledge base URL.")
+            crawled_documents = len(docs)
             self.vector_store_manager.clear()
             self.vector_store_manager.add_documents(docs)
             
@@ -86,6 +98,47 @@ Be professional, concise, and helpful.
             self.additional_guidelines = guidelines
             
         self.reload_agent()
+        return {
+            "recrawled": should_recrawl,
+            "documents_indexed": crawled_documents,
+            "knowledge_base_url": self.knowledge_base_url,
+        }
+
+    def ingest_documents(self, files: List[tuple[str, bytes]], replace_existing: bool = False):
+        documents = []
+        failed_files = []
+        rejected_files = []
+        accepted_files = []
+
+        for file_name, content in files:
+            try:
+                docs = self.document_reader.read_bytes(file_name, content)
+                sample_text = "\n".join(doc.page_content for doc in docs[:8])
+                assessment = self.relevance_guard.evaluate(file_name, sample_text)
+                if assessment["decision"] != "accepted":
+                    rejected_files.append(assessment)
+                    continue
+                accepted_files.append(assessment)
+                documents.extend(docs)
+            except Exception as e:
+                failed_files.append({"file_name": file_name, "error": str(e)})
+
+        if not documents:
+            raise ValueError("No relevant documents were accepted from uploaded files.")
+
+        if replace_existing:
+            self.vector_store_manager.clear()
+
+        self.vector_store_manager.add_documents(documents)
+        self.reload_agent()
+
+        return {
+            "ingested_documents": len(documents),
+            "ingested_files": len(accepted_files),
+            "accepted_files": accepted_files,
+            "rejected_files": rejected_files,
+            "failed_files": failed_files,
+        }
 
     def reload_agent(self):
         """Re-create the agent with current configuration."""

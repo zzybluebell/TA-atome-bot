@@ -1,0 +1,32 @@
+services:
+  backend:
+    build:
+      context: ./atome-bot/backend
+    env_file:
+      - ./atome-bot/backend/.env
+    environment:
+      CHROMA_PERSIST_DIR: /app/chroma_db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./atome-bot/backend:/app
+      - atomebot_chroma:/app/chroma_db
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./atome-bot/frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./atome-bot/frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+
+volumes:
+  atomebot_chroma:
